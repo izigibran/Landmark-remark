@@ -1,8 +1,11 @@
 import React, { Component } from 'react';
 import GoogleMap from 'google-map-react';
 import Modal from "react-responsive-modal";
+import queryString  from 'query-string';
+
 import withAuth from './withAuth';
 import NotesService from './NotesService';
+import SearchService from './SearchService';
 
 const modalStyle = {
   fontFamily: "sans-serif",
@@ -32,21 +35,29 @@ class App extends Component {
       showSearch: false,
       value: '',
       searchValueUser: '',
-      searchValueNote: ''
-
+      searchValueNote: '',
+      searchResultNo: 0,
+      searchResultNotes: [],
+      resultShowlat:0,
+      resultShowlng:0
     };
     this.addNote = this.addNote.bind(this);
+    this.searchNote = this.searchNote.bind(this);
     this.updateInput = this.updateInput.bind(this);
     this.updateInputSearchNote = this.updateInputSearchNote.bind(this);
     this.updateInputSearchUser = this.updateInputSearchUser.bind(this);
     this.NotesService = new NotesService();
-  }
+    this.SearchService = new SearchService();
 
-  componentWillMount() {
     this.getLocation();
+
+
     this.NotesService.getNotes().then(response =>{
       this.setState({ all_notes:response.user_notes });
     });
+
+    const parsed = this.props.history && queryString.parse(this.props.history.location.search);
+    parsed && console.log({parsed});
   }
 
   onCloseNotesModal = () => {
@@ -54,8 +65,11 @@ class App extends Component {
     this.setState({ showList: false });
     this.setState({ showNoteWrite: false });
     this.setState({ showSearch: false });
+    this.setState({ searchResultNo: 0 });
+    this.setState({ searchResultNotes: [] });
     window.location.replace('http://localhost:3000/landmark')
   };
+
 
   handleLogOut =() => {
     //Remove Local storage and redirect to index
@@ -74,8 +88,8 @@ class App extends Component {
     if ("geolocation" in navigator) {
       navigator.geolocation.watchPosition(position => {
         let location = { lat: position.coords.latitude, lng: position.coords.longitude };
-        console.log(location.lat);
-        console.log(location.lng);
+        //console.log(location.lat);
+        //console.log(location.lng);
         if(!localStorage.getItem('current-lat') ||location.lat !== localStorage.getItem('current-lat') ){
           localStorage.setItem('current-lat', location.lat) ;
         }
@@ -90,6 +104,20 @@ class App extends Component {
       alert("You need to have the location feature");
     }
   };
+
+  showNotesResult(map, maps){
+   let notesMarker=  new maps.Marker({
+      position: {lat:this.state.resultShowlat, lng:this.state.resultShowlng },
+      map,
+      icon: {
+        labelOrigin: new maps.Point(19,64),
+        url: "https://i.ibb.co/SBmGrLX/Location.png"
+      },
+      title:"Notes"
+    });
+    map.setZoom(17);
+    map.panTo(notesMarker.position);
+  }
 
   getMarkerNotes(map, maps) {
     //Marker of current location
@@ -198,7 +226,7 @@ class App extends Component {
       this.NotesService.addNote(this.state.value).then(response =>{
         return response
       }).then(()=>{
-        const addForm = document.getElementsByName('add-note')[0];
+        const addForm = document.getElementsByName('add-note');
         addForm.reset();
         alert("Note added!");
         this.setState({ value: ''});
@@ -206,10 +234,23 @@ class App extends Component {
     }
   }
 
-  searchNote(e) {
+  async searchNote(e) {
     e.preventDefault();
     if(this.state.searchValueUser || this.state.searchValueNote) {
+      console.log(this.state.searchValueUser);
+      const result = await this.SearchService.getUserNotes(this.state.searchValueUser);
+      if(result.length === 0) {
+        alert("No search results !");
+      } else {
+        this.setState({ searchResultNo: result.length});
+        this.setState({ searchResultNotes: result});
+        console.log({result});
+      }
     }
+    const searchForm = document.getElementsByName('search-note')[0];
+    searchForm.reset();
+    this.setState({ searchValueUser: ''});
+    this.setState({ searchValueNote: ''});
   }
 
   updateInput(e){
@@ -258,10 +299,28 @@ class App extends Component {
         <br/>
         <h2>{`Search for a note`}</h2>
         <form name="search-note" onSubmit={this.searchNote}>
-          <input type="text"  placeholder="By user..." onChange={this.updateInputSearchNote} /><br/><br/>
-          <input type="text"  placeholder="By note..." onChange={this.updateInputSearchUser} /><br/><br/>
+          <input type="text"  placeholder="By user..." onChange={this.updateInputSearchUser} /><br/><br/>
+          <input type="text"  placeholder="By note..." onChange={this.updateInputSearchNote} /><br/><br/>
           <input type="submit" value="Search"/>
         </form>
+        {(this.state.searchResultNo > 0 )?
+          <div>
+            <br/>
+            <br/>
+            <h2>{`Search Result: ${this.state.searchResultNo}`}</h2>
+            <br/>
+            <div>
+              <ul>
+                {this.state.searchResultNotes.map(function(note, _){
+                  const notesLink = `http://localhost:3000/landmark?lat=${note.lat}&lng=${note.lng}`;
+                  return (<li>
+                    {`Notes of user: ${note.user} at location  [${note.lat}, ${note.lng}] `},
+                    <a href={notesLink}>View</a></li>)
+                })}
+              </ul>
+            </div>
+          </div>
+          :''}
       </div>)
     }
   }
@@ -280,10 +339,15 @@ class App extends Component {
               style={mapStyles}
               bootstrapURLKeys={{key: 'AIzaSyAptoEhIrPGU6QLb9h3wi2VCiFOfENH_sM'}}
               defaultCenter={{lat: this.state.center.lat, lng: this.state.center.lng}}
-              zoom={1}
+              defaultZoom={1}
               yesIWantToUseGoogleMapApiInternals={true}
               onGoogleApiLoaded={({map, maps}) => {
-                this.getMarkerNotes(map, maps);
+
+                if(false){
+                  this.showNotesResult(map, maps)
+                } else {
+                  this.getMarkerNotes(map, maps);
+                }
               }}>
             </GoogleMap>
           </div>

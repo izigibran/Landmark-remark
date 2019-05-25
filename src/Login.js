@@ -18,7 +18,6 @@ class Login extends Component {
     };
     this.LoginService = new LoginService();
     this.RegisterService = new RegisterService();
-
   }
 
   openModal(initialTab) {

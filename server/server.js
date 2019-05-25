@@ -57,10 +57,11 @@ app.get('/notes/all', (req, res) => {
   res.json({ 'user_notes': notes });
 });
 
-
-app.get('/search', (req, res) => {
-  res.json({ 'status': 200 });
+app.get('/search/user/notes/:user', (req, res) => {
+  const allNotes = db.instance.get('notes').value();
+  const userNotes = allNotes.filter(u => u.user === req.params.user);
+  res.json(userNotes);
 });
 
 app.listen(8899);
-console.log('========Sever Started======');
+console.log('======== Sever Started on port 8899 ======');
