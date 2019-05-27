@@ -38,18 +38,22 @@ app.use(basicAuth({
 app.post('/note', (req, res) => {
   let existingNotes = [];
   const {user, lng, lat, note} = req.body;
-  let dbNotes = db.instance.get('notes').value();
-  if(dbNotes.length === 0){
-    db.instance.get('notes').push({user, lng, lat, notes:[note]}).write();
-  } else {
+  if(user && lng && lat && note) {
+    let dbNotes = db.instance.get('notes').value();
+    if(dbNotes.length === 0){
+      db.instance.get('notes').push({user, lng, lat, notes:[note]}).write();
+    } else {
       if(!db.instance.get('notes').find({ user: user, lng:lng , lat: lat  }).value()){
         db.instance.get('notes').push({user, lng, lat, notes:[note]}).write();
       } else {
         existingNotes = db.instance.get('notes').find({ user: 'one', lng: lng , lat: lat }).value().notes;
         db.instance.get('notes').find({ user: user, lng:lng , lat: lat  }).assign({ notes: [...existingNotes, note]}).write()
       }
+    }
+    res.json({ 'status': 200 });
+  } else {
+    return res.sendStatus(404);
   }
-  res.json({ 'status': 200 });
 });
 
 app.get('/notes/all', (req, res) => {
@@ -62,6 +66,21 @@ app.get('/search/user/notes/:user', (req, res) => {
   const userNotes = allNotes.filter(u => u.user === req.params.user);
   res.json(userNotes);
 });
+
+app.get('/:lat/:lng/notes/:user', (req, res) => {
+  const {lat, lng, user} = req.params;
+  const notes = db.instance.get('notes').find({user: user,  lat: parseFloat(lat), lng: parseFloat(lng)}).value().notes;
+  res.json(notes);
+});
+
+
+app.get('/search/notes/:text', (req, res) => {
+  const regex = new RegExp( req.params.text, 'ig' );
+  const allNotes = db.instance.get('notes').value();
+  const foundNotesByText =  allNotes.filter(loc => loc.notes.some(n => n.match(regex) && n.match(regex)));
+  res.json(foundNotesByText);
+});
+
 
 app.listen(8899);
 console.log('======== Sever Started on port 8899 ======');

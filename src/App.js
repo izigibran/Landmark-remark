@@ -1,11 +1,12 @@
 import React, { Component } from 'react';
 import GoogleMap from 'google-map-react';
 import Modal from "react-responsive-modal";
-import queryString  from 'query-string';
 
 import withAuth from './withAuth';
 import NotesService from './NotesService';
 import SearchService from './SearchService';
+import {getHost} from './const'
+import {searchReset, searchLat, searchLng, searchSet, searchUser} from './cacheSearch'
 
 const modalStyle = {
   fontFamily: "sans-serif",
@@ -15,6 +16,14 @@ const modalStyle = {
 const mapStyles = {
   width: '100%',
   height: '100%'
+};
+
+const backLandMark = {
+  "background": "red",
+  "border-radius": "8px",
+  "color": "white",
+  "width": "9%",
+  "height": "5%",
 };
 
 class App extends Component {
@@ -33,13 +42,13 @@ class App extends Component {
       showList: false,
       showNoteWrite: false,
       showSearch: false,
+      showResultLocationZoom: false,
       value: '',
       searchValueUser: '',
       searchValueNote: '',
       searchResultNo: 0,
       searchResultNotes: [],
-      resultShowlat:0,
-      resultShowlng:0
+      selectedRadio: 'user'
     };
     this.addNote = this.addNote.bind(this);
     this.searchNote = this.searchNote.bind(this);
@@ -48,16 +57,6 @@ class App extends Component {
     this.updateInputSearchUser = this.updateInputSearchUser.bind(this);
     this.NotesService = new NotesService();
     this.SearchService = new SearchService();
-
-    this.getLocation();
-
-
-    this.NotesService.getNotes().then(response =>{
-      this.setState({ all_notes:response.user_notes });
-    });
-
-    const parsed = this.props.history && queryString.parse(this.props.history.location.search);
-    parsed && console.log({parsed});
   }
 
   onCloseNotesModal = () => {
@@ -67,9 +66,17 @@ class App extends Component {
     this.setState({ showSearch: false });
     this.setState({ searchResultNo: 0 });
     this.setState({ searchResultNotes: [] });
-    window.location.replace('http://localhost:3000/landmark')
+    window.location.replace(`${getHost()}/landmark`)
   };
 
+  componentWillMount() {
+    searchSet(this.props.history && this.props.history.location.search);
+    if(searchLat() && searchLng() && searchUser()) this.setState({ showResultLocationZoom: true });
+    this.getLocation();
+    this.NotesService.getNotes().then(response =>{
+      this.setState({ all_notes:response.user_notes });
+    });
+  }
 
   handleLogOut =() => {
     //Remove Local storage and redirect to index
@@ -78,7 +85,7 @@ class App extends Component {
     localStorage.removeItem('landmark-auth-pass');
     localStorage.removeItem('current-lng');
     localStorage.removeItem('current-lat');
-    window.location.replace('http://localhost:3000/')
+    window.location.replace(`${getHost()}/landmark`)
   };
 
   getLocation = () => {
@@ -88,8 +95,6 @@ class App extends Component {
     if ("geolocation" in navigator) {
       navigator.geolocation.watchPosition(position => {
         let location = { lat: position.coords.latitude, lng: position.coords.longitude };
-        //console.log(location.lat);
-        //console.log(location.lng);
         if(!localStorage.getItem('current-lat') ||location.lat !== localStorage.getItem('current-lat') ){
           localStorage.setItem('current-lat', location.lat) ;
         }
@@ -105,118 +110,148 @@ class App extends Component {
     }
   };
 
-  showNotesResult(map, maps){
-   let notesMarker=  new maps.Marker({
-      position: {lat:this.state.resultShowlat, lng:this.state.resultShowlng },
-      map,
-      icon: {
-        labelOrigin: new maps.Point(19,64),
-        url: "https://i.ibb.co/SBmGrLX/Location.png"
-      },
-      title:"Notes"
-    });
-    map.setZoom(17);
-    map.panTo(notesMarker.position);
-  }
-
-  getMarkerNotes(map, maps) {
-    //Marker of current location
-    new maps.Marker({
-      position: {lat:parseFloat(localStorage.getItem('current-lat')), lng: parseFloat(localStorage.getItem('current-lng'))},
-      map,
-      icon: {
-        labelOrigin: new maps.Point(19,64),
-        url: "https://i.ibb.co/SBmGrLX/Location.png"
-      },
-      title:"My current location"
-    });
-
-    //Get instance of context to pass to click listeners for markers
-    const self = this;
-    //Build the note markers of users
-    this.state.all_notes.forEach(loc =>{
-      const userText = (loc.user === localStorage.getItem('landmark-auth-user'))? `${loc.user} (My notes)` : loc.user;
-      let marker = new maps.Marker({
-        position: loc,
+  showNotesResult(map, maps, locationNote, self){
+      let marker =  new maps.Marker({
+        position: {lat: searchLat(), lng:searchLng() },
         map,
         icon: {
-          labelOrigin: new maps.Point(16,64),
+          labelOrigin: new maps.Point(19,64),
           url: "https://drive.google.com/uc?id=0B3RD6FDNxXbdVXRhZHFnV2xaS1E"
         },
-        notes: loc.notes,
+        title:"Notes",
         label: {
-          text: userText,
+          text: "Notes",
           color: "black",
           fontWeight: "bold",
           fontSize: "16px"
         }
       });
+
       maps.event.addListener(marker, 'click', function () {
         self.setState({ openNotesModal: true });
         self.setState({ showList: true });
-        self.setState({ currentUserMarker: marker.label.text });
-        self.setState({ notes: marker.notes })
+        self.setState({ currentUserMarker: locationNote.user });
+        self.setState({ notes: locationNote.notes })
       });
-    });
 
-    let markerSearch = new maps.Marker({
-      position: {lat:-26.190810, lng:-110.013226}, // this position is hardcoded, ideally it should be calculated but it will be in the ocean so unlikely to overlap an users position
-      map,
-      icon: {
-        labelOrigin: new maps.Point(19,64),
-        url: "https://i.ibb.co/xG32Rr6/Search.png"
-      },
-      label: {
-        text: "Search",
-        color: "black",
-        fontWeight: "bold",
-        fontSize: "10px"
-      }
-    });
-    maps.event.addListener(markerSearch, 'click', function () {
-      self.setState({ openNotesModal: true });
-      self.setState({ showSearch: true });
-    });
+      map.setZoom(15);
+      map.panTo(marker.position);
+      //Reset query string on url after result focus
+      window.history.pushState({}, null,  `${getHost()}/landmark`);
+      //Reset search cache
+      searchReset();
+  }
 
-    //Create a marker that displays modal that contains an input form
-    //This is to handle add notes (on my location)
-    let markerMenu = new maps.Marker({
-      position: {lat:-38.190810, lng:-110.013226}, // this position is hardcoded, ideally it should be calculated but it will be in the ocean so unlikely to overlap an users position
-      map,
-      icon: {
-        labelOrigin: new maps.Point(19,64),
-        url: "https://i.ibb.co/XV1yrPv/write.png"
-      },
-      label: {
-        text: "Add note (on my location)",
-        color: "black",
-        fontWeight: "bold",
-        fontSize: "10px"
-      }
-    });
-    maps.event.addListener(markerMenu, 'click', function () {
-      self.setState({ openNotesModal: true });
-      self.setState({ showNoteWrite: true });
-    });
+  buildMap(map, maps) {
 
-    let markerLogOut = new maps.Marker({
-      position: {lat:-48.190810, lng:-110.013226}, // this position is hardcoded, ideally it should be calculated but it will be in the ocean so unlikely to overlap an users position
-      map,
-      icon: {
-        labelOrigin: new maps.Point(19,64),
-        url: "https://i.ibb.co/WtGmtcg/logout.png"
-      },
-      label: {
-        text: "Log Out",
-        color: "black",
-        fontWeight: "bold",
-        fontSize: "10px"
-      }
-    });
+    //Get instance of context to pass to click listeners for markers
+    const self = this;
 
-    maps.event.addListener(markerLogOut, 'click', function () {
-      self.handleLogOut()
-    });
+    if(searchLat() && searchLng() && searchUser) {
+
+      const note = this.state.all_notes.find(n => n.lat =searchLat() && n.lng === searchLng() && n.user === searchUser());
+      this.showNotesResult(map, maps, note, self)
+
+    } else {
+      //Marker of current location
+      new maps.Marker({
+        position: {lat:parseFloat(localStorage.getItem('current-lat')), lng: parseFloat(localStorage.getItem('current-lng'))},
+        map,
+        icon: {
+          labelOrigin: new maps.Point(19,64),
+          url: "https://i.ibb.co/SBmGrLX/Location.png"
+        },
+        title:"My current location"
+      });
+
+
+      //Build the note markers of users
+      this.state.all_notes.forEach(loc =>{
+        const userText = (loc.user === localStorage.getItem('landmark-auth-user'))? `${loc.user} (My notes)` : loc.user;
+        let marker = new maps.Marker({
+          position: loc,
+          map,
+          icon: {
+            labelOrigin: new maps.Point(16,64),
+            url: "https://drive.google.com/uc?id=0B3RD6FDNxXbdVXRhZHFnV2xaS1E"
+          },
+          notes: loc.notes,
+          label: {
+            text: userText,
+            color: "black",
+            fontWeight: "bold",
+            fontSize: "16px"
+          }
+        });
+        maps.event.addListener(marker, 'click', function () {
+          self.setState({ openNotesModal: true });
+          self.setState({ showList: true });
+          self.setState({ currentUserMarker: marker.label.text });
+          self.setState({ notes: marker.notes })
+        });
+      });
+
+      let markerSearch = new maps.Marker({
+        position: {lat:-26.190810, lng:-110.013226}, // this position is hardcoded, ideally it should be calculated but it will be in the ocean so unlikely to overlap an users position
+        map,
+        icon: {
+          labelOrigin: new maps.Point(19,64),
+          url: "https://i.ibb.co/xG32Rr6/Search.png"
+        },
+        label: {
+          text: "Search",
+          color: "black",
+          fontWeight: "bold",
+          fontSize: "10px"
+        }
+      });
+
+      maps.event.addListener(markerSearch, 'click', function () {
+        self.setState({ openNotesModal: true });
+        self.setState({ showSearch: true });
+      });
+
+      //Create a marker that displays modal that contains an input form
+      //This is to handle add notes (on my location)
+      let markerMenu = new maps.Marker({
+        position: {lat:-38.190810, lng:-110.013226}, // this position is hardcoded, ideally it should be calculated but it will be in the ocean so unlikely to overlap an users position
+        map,
+        icon: {
+          labelOrigin: new maps.Point(19,64),
+          url: "https://i.ibb.co/XV1yrPv/write.png"
+        },
+        label: {
+          text: "Add note (on my location)",
+          color: "black",
+          fontWeight: "bold",
+          fontSize: "10px"
+        }
+      });
+      maps.event.addListener(markerMenu, 'click', function () {
+        self.setState({ openNotesModal: true });
+        self.setState({ showNoteWrite: true });
+      });
+
+      let markerLogOut = new maps.Marker({
+        position: {lat:-48.190810, lng:-110.013226}, // this position is hardcoded, ideally it should be calculated but it will be in the ocean so unlikely to overlap an users position
+        map,
+        icon: {
+          labelOrigin: new maps.Point(19,64),
+          url: "https://i.ibb.co/WtGmtcg/logout.png"
+        },
+        label: {
+          text: "Log Out",
+          color: "black",
+          fontWeight: "bold",
+          fontSize: "10px"
+        }
+      });
+
+      maps.event.addListener(markerLogOut, 'click', function () {
+        self.handleLogOut()
+      });
+
+    } //End else
 
   }
 
@@ -226,31 +261,42 @@ class App extends Component {
       this.NotesService.addNote(this.state.value).then(response =>{
         return response
       }).then(()=>{
-        const addForm = document.getElementsByName('add-note');
+        const addForm = document.getElementsByName('add-note')[0];
         addForm.reset();
         alert("Note added!");
         this.setState({ value: ''});
+      }).catch(e =>{
+        alert("Error, most likely location has not been set, please try on firefox");
       });
     }
   }
 
+  resetSearch(){
+    const searchForm = document.getElementsByName('search-note')[0];
+    searchForm.reset();
+  }
+
   async searchNote(e) {
     e.preventDefault();
-    if(this.state.searchValueUser || this.state.searchValueNote) {
-      console.log(this.state.searchValueUser);
+    if(this.state.searchValueUser) {
       const result = await this.SearchService.getUserNotes(this.state.searchValueUser);
+      this.setState({ searchValueUser: ''});
       if(result.length === 0) {
         alert("No search results !");
       } else {
         this.setState({ searchResultNo: result.length});
         this.setState({ searchResultNotes: result});
-        console.log({result});
+      }
+    } else if (this.state.searchValueNote){
+      const result = await this.SearchService.getTextNotes(this.state.searchValueNote);
+      if(result.length === 0) {
+        alert("No search results !");
+      } else {
+        this.setState({ searchResultNo: result.length});
+        this.setState({ searchResultNotes: result});
       }
     }
-    const searchForm = document.getElementsByName('search-note')[0];
-    searchForm.reset();
-    this.setState({ searchValueUser: ''});
-    this.setState({ searchValueNote: ''});
+    this.resetSearch()
   }
 
   updateInput(e){
@@ -298,7 +344,7 @@ class App extends Component {
         <br/>
         <br/>
         <h2>{`Search for a note`}</h2>
-        <form name="search-note" onSubmit={this.searchNote}>
+        <form name="search-note" onSubmit={this.searchNote} >
           <input type="text"  placeholder="By user..." onChange={this.updateInputSearchUser} /><br/><br/>
           <input type="text"  placeholder="By note..." onChange={this.updateInputSearchNote} /><br/><br/>
           <input type="submit" value="Search"/>
@@ -311,9 +357,9 @@ class App extends Component {
             <br/>
             <div>
               <ul>
-                {this.state.searchResultNotes.map(function(note, _){
-                  const notesLink = `http://localhost:3000/landmark?lat=${note.lat}&lng=${note.lng}`;
-                  return (<li>
+                {this.state.searchResultNotes.map(function(note, idx){
+                  const notesLink = `${getHost()}/landmark?lat=${note.lat}&lng=${note.lng}&user=${note.user}`;
+                  return (<li key={idx}>
                     {`Notes of user: ${note.user} at location  [${note.lat}, ${note.lng}] `},
                     <a href={notesLink}>View</a></li>)
                 })}
@@ -326,7 +372,7 @@ class App extends Component {
   }
 
   render() {
-    const { openNotesModal } = this.state;
+    const { openNotesModal, showResultLocationZoom } = this.state;
     return (
         <main>
           <div style={modalStyle}>
@@ -342,13 +388,13 @@ class App extends Component {
               defaultZoom={1}
               yesIWantToUseGoogleMapApiInternals={true}
               onGoogleApiLoaded={({map, maps}) => {
-
-                if(false){
-                  this.showNotesResult(map, maps)
-                } else {
-                  this.getMarkerNotes(map, maps);
-                }
+                this.buildMap(map, maps);
               }}>
+              {showResultLocationZoom && <button style={backLandMark} onClick={(e) => {
+                window.location.replace(`${getHost()}/landmark`)
+              }} >
+                Back to Landmark
+              </button>}
             </GoogleMap>
           </div>
         </main>

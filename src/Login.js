@@ -2,7 +2,7 @@ import React, { Component } from 'react';
 import ReactModalLogin from 'react-modal-login';
 import RegisterService from './RegisterService';
 import LoginService from './LoginService';
-
+import {getHost} from './const'
 
 class Login extends Component {
 
@@ -51,7 +51,7 @@ class Login extends Component {
     this.LoginService.login(user,password)
       .then((res) => {
           if(res.status === 200){
-            window.location.replace('http://localhost:3000/landmark')
+            window.location.replace(`${getHost()}/landmark`)
           }
         }
       )
@@ -67,7 +67,7 @@ class Login extends Component {
     this.RegisterService.register(user,password)
       .then((res) => {
           if(res.status === 200){
-            window.location.replace('http://localhost:3000/landmark')
+            window.location.replace(`${getHost()}/landmark`)
           }
         }
       )
