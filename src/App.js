@@ -66,7 +66,7 @@ class App extends Component {
     this.setState({ showSearch: false });
     this.setState({ searchResultNo: 0 });
     this.setState({ searchResultNotes: [] });
-    window.location.replace(`${getHost()}/landmark`)
+    window.location.replace(`${getHost()}/`)
   };
 
   componentWillMount() {
@@ -85,7 +85,7 @@ class App extends Component {
     localStorage.removeItem('landmark-auth-pass');
     localStorage.removeItem('current-lng');
     localStorage.removeItem('current-lat');
-    window.location.replace(`${getHost()}/landmark`)
+    window.location.replace(`${getHost()}/`)
   };
 
   getLocation = () => {
@@ -137,7 +137,7 @@ class App extends Component {
       map.setZoom(15);
       map.panTo(marker.position);
       //Reset query string on url after result focus
-      window.history.pushState({}, null,  `${getHost()}/landmark`);
+      window.history.pushState({}, null,  `${getHost()}/`);
       //Reset search cache
       searchReset();
   }
@@ -358,7 +358,7 @@ class App extends Component {
             <div>
               <ul>
                 {this.state.searchResultNotes.map(function(note, idx){
-                  const notesLink = `${getHost()}/landmark?lat=${note.lat}&lng=${note.lng}&user=${note.user}`;
+                  const notesLink = `${getHost()}?lat=${note.lat}&lng=${note.lng}&user=${note.user}`;
                   return (<li key={idx}>
                     {`Notes of user: ${note.user} at location  [${note.lat}, ${note.lng}] `},
                     <a href={notesLink}>View</a></li>)
@@ -391,7 +391,7 @@ class App extends Component {
                 this.buildMap(map, maps);
               }}>
               {showResultLocationZoom && <button style={backLandMark} onClick={(e) => {
-                window.location.replace(`${getHost()}/landmark`)
+                window.location.replace(`${getHost()}/`)
               }} >
                 Back to Landmark
               </button>}

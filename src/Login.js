@@ -51,7 +51,7 @@ class Login extends Component {
     this.LoginService.login(user,password)
       .then((res) => {
           if(res.status === 200){
-            window.location.replace(`${getHost()}/landmark`)
+            window.location.replace(`${getHost()}`)
           }
         }
       )
@@ -67,7 +67,7 @@ class Login extends Component {
     this.RegisterService.register(user,password)
       .then((res) => {
           if(res.status === 200){
-            window.location.replace(`${getHost()}/landmark`)
+            window.location.replace(`${getHost()}`)
           }
         }
       )
