@@ -30,14 +30,6 @@ class Login extends Component {
     });
   }
 
-  onLoginSuccess(method, response) {
-    this.closeModal();
-    this.setState({
-      loggedIn: method,
-      loading: false
-    })
-  }
-
   closeModal() {
     this.setState({
       showModal: false,
@@ -61,7 +53,6 @@ class Login extends Component {
   }
 
   onRegister() {
-    console.log('__onRegister__');
     const user = document.querySelector('#user').value;
     const password = document.querySelector('#password').value;
     this.RegisterService.register(user,password)

@@ -52,7 +52,7 @@ app.post('/note', (req, res) => {
     }
     res.json({ 'status': 200 });
   } else {
-    return res.sendStatus(404);
+    return res.sendStatus(400);
   }
 });
 
@@ -67,20 +67,12 @@ app.get('/search/user/notes/:user', (req, res) => {
   res.json(userNotes);
 });
 
-app.get('/:lat/:lng/notes/:user', (req, res) => {
-  const {lat, lng, user} = req.params;
-  const notes = db.instance.get('notes').find({user: user,  lat: parseFloat(lat), lng: parseFloat(lng)}).value().notes;
-  res.json(notes);
-});
-
-
 app.get('/search/notes/:text', (req, res) => {
   const regex = new RegExp( req.params.text, 'ig' );
   const allNotes = db.instance.get('notes').value();
   const foundNotesByText =  allNotes.filter(loc => loc.notes.some(n => n.match(regex) && n.match(regex)));
   res.json(foundNotesByText);
 });
-
 
 app.listen(8899);
 console.log('======== Sever Started on port 8899 ======');

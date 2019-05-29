@@ -73,9 +73,6 @@ class App extends Component {
     searchSet(this.props.history && this.props.history.location.search);
     if(searchLat() && searchLng() && searchUser()) this.setState({ showResultLocationZoom: true });
     this.getLocation();
-    this.NotesService.getNotes().then(response =>{
-      this.setState({ all_notes:response.user_notes });
-    });
   }
 
   handleLogOut =() => {
@@ -143,115 +140,115 @@ class App extends Component {
   }
 
   buildMap(map, maps) {
-
     //Get instance of context to pass to click listeners for markers
     const self = this;
 
-    if(searchLat() && searchLng() && searchUser) {
-
-      const note = this.state.all_notes.find(n => n.lat =searchLat() && n.lng === searchLng() && n.user === searchUser());
-      this.showNotesResult(map, maps, note, self)
-
-    } else {
-      //Marker of current location
-      new maps.Marker({
-        position: {lat:parseFloat(localStorage.getItem('current-lat')), lng: parseFloat(localStorage.getItem('current-lng'))},
-        map,
-        icon: {
-          labelOrigin: new maps.Point(19,64),
-          url: "https://i.ibb.co/SBmGrLX/Location.png"
-        },
-        title:"My current location"
-      });
-
-
-      //Build the note markers of users
-      this.state.all_notes.forEach(loc =>{
-        const userText = (loc.user === localStorage.getItem('landmark-auth-user'))? `${loc.user} (My notes)` : loc.user;
-        let marker = new maps.Marker({
-          position: loc,
+    self.NotesService.getNotes().then(response =>{
+      self.setState({ all_notes:response.user_notes });
+      if(searchLat() && searchLng() && searchUser) {
+        const note = self.state.all_notes.find(n => n.lat =searchLat() && n.lng === searchLng() && n.user === searchUser());
+        this.showNotesResult(map, maps, note, self)
+      } else {
+        //Marker of current location
+        new maps.Marker({
+          position: {lat:parseFloat(localStorage.getItem('current-lat')), lng: parseFloat(localStorage.getItem('current-lng'))},
           map,
           icon: {
-            labelOrigin: new maps.Point(16,64),
-            url: "https://drive.google.com/uc?id=0B3RD6FDNxXbdVXRhZHFnV2xaS1E"
+            labelOrigin: new maps.Point(19,64),
+            url: "https://i.ibb.co/SBmGrLX/Location.png"
           },
-          notes: loc.notes,
+          title:"My current location"
+        });
+
+        //Build the note markers of users
+        this.state.all_notes.forEach(loc =>{
+          const userText = (loc.user === localStorage.getItem('landmark-auth-user'))? `${loc.user} (My notes)` : loc.user;
+          let marker = new maps.Marker({
+            position: loc,
+            map,
+            icon: {
+              labelOrigin: new maps.Point(16,64),
+              url: "https://drive.google.com/uc?id=0B3RD6FDNxXbdVXRhZHFnV2xaS1E"
+            },
+            notes: loc.notes,
+            label: {
+              text: userText,
+              color: "black",
+              fontWeight: "bold",
+              fontSize: "16px"
+            }
+          });
+          maps.event.addListener(marker, 'click', function () {
+            self.setState({ openNotesModal: true });
+            self.setState({ showList: true });
+            self.setState({ currentUserMarker: marker.label.text });
+            self.setState({ notes: marker.notes })
+          });
+        });
+
+        let markerSearch = new maps.Marker({
+          position: {lat:-26.190810, lng:-110.013226}, // this position is hardcoded, ideally it should be calculated but it will be in the ocean so unlikely to overlap an users position
+          map,
+          icon: {
+            labelOrigin: new maps.Point(19,64),
+            url: "https://i.ibb.co/xG32Rr6/Search.png"
+          },
           label: {
-            text: userText,
+            text: "Search",
             color: "black",
             fontWeight: "bold",
-            fontSize: "16px"
+            fontSize: "10px"
           }
         });
-        maps.event.addListener(marker, 'click', function () {
+
+        maps.event.addListener(markerSearch, 'click', function () {
           self.setState({ openNotesModal: true });
-          self.setState({ showList: true });
-          self.setState({ currentUserMarker: marker.label.text });
-          self.setState({ notes: marker.notes })
+          self.setState({ showSearch: true });
         });
-      });
 
-      let markerSearch = new maps.Marker({
-        position: {lat:-26.190810, lng:-110.013226}, // this position is hardcoded, ideally it should be calculated but it will be in the ocean so unlikely to overlap an users position
-        map,
-        icon: {
-          labelOrigin: new maps.Point(19,64),
-          url: "https://i.ibb.co/xG32Rr6/Search.png"
-        },
-        label: {
-          text: "Search",
-          color: "black",
-          fontWeight: "bold",
-          fontSize: "10px"
-        }
-      });
+        //Create a marker that displays modal that contains an input form
+        //This is to handle add notes (on my location)
+        let markerMenu = new maps.Marker({
+          position: {lat:-38.190810, lng:-110.013226}, // this position is hardcoded, ideally it should be calculated but it will be in the ocean so unlikely to overlap an users position
+          map,
+          icon: {
+            labelOrigin: new maps.Point(19,64),
+            url: "https://i.ibb.co/XV1yrPv/write.png"
+          },
+          label: {
+            text: "Add note (on my location)",
+            color: "black",
+            fontWeight: "bold",
+            fontSize: "10px"
+          }
+        });
+        maps.event.addListener(markerMenu, 'click', function () {
+          self.setState({ openNotesModal: true });
+          self.setState({ showNoteWrite: true });
+        });
 
-      maps.event.addListener(markerSearch, 'click', function () {
-        self.setState({ openNotesModal: true });
-        self.setState({ showSearch: true });
-      });
+        let markerLogOut = new maps.Marker({
+          position: {lat:-48.190810, lng:-110.013226}, // this position is hardcoded, ideally it should be calculated but it will be in the ocean so unlikely to overlap an users position
+          map,
+          icon: {
+            labelOrigin: new maps.Point(19,64),
+            url: "https://i.ibb.co/WtGmtcg/logout.png"
+          },
+          label: {
+            text: "Log Out",
+            color: "black",
+            fontWeight: "bold",
+            fontSize: "10px"
+          }
+        });
 
-      //Create a marker that displays modal that contains an input form
-      //This is to handle add notes (on my location)
-      let markerMenu = new maps.Marker({
-        position: {lat:-38.190810, lng:-110.013226}, // this position is hardcoded, ideally it should be calculated but it will be in the ocean so unlikely to overlap an users position
-        map,
-        icon: {
-          labelOrigin: new maps.Point(19,64),
-          url: "https://i.ibb.co/XV1yrPv/write.png"
-        },
-        label: {
-          text: "Add note (on my location)",
-          color: "black",
-          fontWeight: "bold",
-          fontSize: "10px"
-        }
-      });
-      maps.event.addListener(markerMenu, 'click', function () {
-        self.setState({ openNotesModal: true });
-        self.setState({ showNoteWrite: true });
-      });
+        maps.event.addListener(markerLogOut, 'click', function () {
+          self.handleLogOut()
+        });
 
-      let markerLogOut = new maps.Marker({
-        position: {lat:-48.190810, lng:-110.013226}, // this position is hardcoded, ideally it should be calculated but it will be in the ocean so unlikely to overlap an users position
-        map,
-        icon: {
-          labelOrigin: new maps.Point(19,64),
-          url: "https://i.ibb.co/WtGmtcg/logout.png"
-        },
-        label: {
-          text: "Log Out",
-          color: "black",
-          fontWeight: "bold",
-          fontSize: "10px"
-        }
-      });
+      } //End else
 
-      maps.event.addListener(markerLogOut, 'click', function () {
-        self.handleLogOut()
-      });
-
-    } //End else
+    });
 
   }
 
